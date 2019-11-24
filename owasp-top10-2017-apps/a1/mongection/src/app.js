@@ -4,6 +4,15 @@ const path = require('path');
 const mongoose = require('mongoose');
 const db = require('./db');
 
+// Needed for fix
+const sanitize = require('mongo-sanitize');
+var Validator = require('jsonschema').Validator;
+
+var v = new Validator();
+var loginSchema = {"type": "string", "type": "string"};
+
+
+
 const server = express();
 
 const PORT = 10001;
@@ -11,7 +20,7 @@ const PORT = 10001;
 var emailRegex = /^[-!#$%&'*+\/0-9=?A-Z^_a-z{|}~](\.?[-!#$%&'*+\/0-9=?A-Z^_a-z`{|}~])*@[a-zA-Z0-9](-*\.?[a-zA-Z0-9])*\.[a-zA-Z](-?[a-zA-Z0-9])+$/;
 
 server.use(bodyParser.json());
-
+n
 server.use(function(request, response, next) {
     response.header("Access-Control-Allow-Origin", "http://localhost:10001");
     response.header("Access-Control-Allow-Headers", "Content-Type");
@@ -35,19 +44,32 @@ server.get("/register.html", (request, response) => {
 server.post("/login", async (request, response) => {
 
     try {
+        // OLD VULN CODE
+        //const email = request.body.email;
+        //const password = request.body.password;
 
-        const email = request.body.email;
-        const password = request.body.password;
+        // UPDATED CODE SANITIZING USER INPUT
+        const email = sanitize(request.body.email);
+        const password = sanitize(request.body.password);
 
-        const user = await db.login({email, password});
+        var credSet = {email, password}
 
-        console.log(user.length)
+        // Check to see if the schema of the credential set is valid
+        if(v.validate(credSet, schema).valid == true)){
+          const user = await db.login({email, password});
 
-        if(user.length == 0) { response.send('Bad Credentials'); }
+          console.log(user.length)
 
-        response.send("<h1>Hello, Welcome Again!</h1><h3>" + user + "</h3>");
+          if(user.length == 0) { response.send('Bad Credentials'); }
+
+          response.send("<h1>Hello, Welcome Again!</h1><h3>" + user + "</h3>");
+        } else {
+          response.send("<h1> Malformed login JSON Body </h1><h3>" + credSet + "</h3>")
+        }
+
+
     }
-   
+
     catch(error) { throw error; }
 
 
@@ -69,7 +91,7 @@ server.post("/register", async (request, response) => {
 
             response.send("<h1>Welcome to Mongection System</h1><h3>" + user.email + "</h3>");
         }
-        
+
     }
 
     catch(error) { throw error; }
